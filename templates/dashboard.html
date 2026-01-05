@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Network Intrusion Detection System</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #4caf50;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .stat-card h3 {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+        
+        .stat-card .value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .stat-card.danger .value {
+            color: #f44336;
+        }
+        
+        .stat-card.warning .value {
+            color: #ff9800;
+        }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .panel {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .panel h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #eee;
+        }
+        
+        .detection-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .detection-item {
+            padding: 15px;
+            margin-bottom: 10px;
+            border-left: 4px solid #f44336;
+            background: #fff5f5;
+            border-radius: 5px;
+        }
+        
+        .detection-item.normal {
+            border-left-color: #4caf50;
+            background: #f1f8f4;
+        }
+        
+        .detection-item h4 {
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .detection-item .meta {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .confidence-bar {
+            width: 100%;
+            height: 8px;
+            background: #eee;
+            border-radius: 4px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+        
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4caf50, #ff9800, #f44336);
+            transition: width 0.3s;
+        }
+        
+        .alert-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .alert-item {
+            padding: 12px;
+            margin-bottom: 8px;
+            border-radius: 5px;
+            background: #fff3cd;
+            border-left: 4px solid #ff9800;
+        }
+        
+        .alert-item.high {
+            background: #f8d7da;
+            border-left-color: #f44336;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-top: 20px;
+        }
+        
+        .protocol-list {
+            list-style: none;
+        }
+        
+        .protocol-list li {
+            padding: 8px;
+            margin-bottom: 5px;
+            background: #f5f5f5;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .timestamp {
+            font-size: 11px;
+            color: #999;
+        }
+        
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>
+                <span class="status-indicator"></span>
+                Real-Time Network Intrusion Detection System
+            </h1>
+            <p>Monitoring network traffic and detecting intrusions using SecIDS-CNN</p>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Total Packets</h3>
+                <div class="value" id="total-packets">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Total Flows</h3>
+                <div class="value" id="total-flows">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Packets/Second</h3>
+                <div class="value" id="packets-per-sec">0</div>
+            </div>
+            <div class="stat-card danger">
+                <h3>Intrusions Detected</h3>
+                <div class="value" id="intrusions">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Data Rate</h3>
+                <div class="value" id="data-rate">0 KB/s</div>
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <div>
+                <div class="panel">
+                    <h2>Recent Detections</h2>
+                    <div class="detection-list" id="detection-list">
+                        <p style="text-align: center; color: #999; padding: 20px;">
+                            Waiting for network traffic...
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="panel" style="margin-top: 20px;">
+                    <h2>Traffic Statistics</h2>
+                    <div class="chart-container">
+                        <canvas id="traffic-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <div>
+                <div class="panel">
+                    <h2>Alerts</h2>
+                    <div class="alert-list" id="alert-list">
+                        <p style="text-align: center; color: #999; padding: 20px;">
+                            No alerts
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="panel" style="margin-top: 20px;">
+                    <h2>Protocol Distribution</h2>
+                    <ul class="protocol-list" id="protocol-list">
+                        <li>Loading...</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Initialize Socket.IO
+        const socket = io();
+        
+        let lastTrafficUpdate = 0;
+        let lastDetectionsFetch = 0;
+        let lastAlertsFetch = 0;
+        
+        // Initialize Chart.js
+        const ctx = document.getElementById('traffic-chart').getContext('2d');
+        const trafficChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Packets/sec',
+                    data: [],
+                    borderColor: '#667eea',
+                    backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                    tension: 0.4
+                }, {
+                    label: 'Bytes/sec',
+                    data: [],
+                    borderColor: '#764ba2',
+                    backgroundColor: 'rgba(118, 75, 162, 0.1)',
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+        
+        // Update statistics
+        function updateStats(stats) {
+            document.getElementById('total-packets').textContent = 
+                formatNumber(stats.packets_captured || 0);
+            document.getElementById('total-flows').textContent = 
+                formatNumber(stats.flows_processed || 0);
+            document.getElementById('packets-per-sec').textContent = 
+                (stats.packets_per_second || 0).toFixed(1);
+            document.getElementById('intrusions').textContent = 
+                formatNumber(stats.intrusions_detected || 0);
+            
+            const bytesPerSec = stats.bytes_per_second || 0;
+            document.getElementById('data-rate').textContent = 
+                formatBytes(bytesPerSec) + '/s';
+            
+            // Update protocol distribution
+            const protocolList = document.getElementById('protocol-list');
+            const protocols = stats.protocol_distribution || {};
+            
+            if (Object.keys(protocols).length === 0) {
+                protocolList.innerHTML = '<li>No protocol data</li>';
+            } else {
+                protocolList.innerHTML = Object.entries(protocols)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 10)
+                    .map(([protocol, count]) => 
+                        `<li><span>${protocol}</span><span>${formatNumber(count)}</span></li>`
+                    ).join('');
+            }
+            
+            // Update chart
+            const now = new Date().toLocaleTimeString();
+            trafficChart.data.labels.push(now);
+            trafficChart.data.datasets[0].data.push(stats.packets_per_second || 0);
+            trafficChart.data.datasets[1].data.push((stats.bytes_per_second || 0) / 1024);
+            
+            // Keep only last 20 data points
+            if (trafficChart.data.labels.length > 20) {
+                trafficChart.data.labels.shift();
+                trafficChart.data.datasets[0].data.shift();
+                trafficChart.data.datasets[1].data.shift();
+            }
+            
+            trafficChart.update('none');
+            lastTrafficUpdate = Date.now();
+        }
+        
+        // Add detection
+        function addDetection(detection) {
+            const detectionList = document.getElementById('detection-list');
+            
+            // Remove placeholder if exists
+            if (detectionList.querySelector('p')) {
+                detectionList.innerHTML = '';
+            }
+            
+            const item = document.createElement('div');
+            item.className = `detection-item ${detection.prediction === 'Normal' ? 'normal' : ''}`;
+            
+            const confidence = (detection.confidence * 100).toFixed(1);
+            
+            item.innerHTML = `
+                <h4>${detection.src_ip} → ${detection.dst_ip}</h4>
+                <div class="meta">
+                    Protocol: ${detection.protocol} | 
+                    Packets: ${detection.total_packets} | 
+                    Duration: ${detection.flow_duration.toFixed(2)}s
+                </div>
+                <div class="confidence-bar">
+                    <div class="confidence-fill" style="width: ${confidence}%"></div>
+                </div>
+                <div class="meta">Confidence: ${confidence}%</div>
+                <div class="timestamp">${new Date().toLocaleString()}</div>
+            `;
+            
+            detectionList.insertBefore(item, detectionList.firstChild);
+            
+            // Keep only last 50 detections
+            while (detectionList.children.length > 50) {
+                detectionList.removeChild(detectionList.lastChild);
+            }
+        }
+        
+        // Add alert
+        function addAlert(alert) {
+            const alertList = document.getElementById('alert-list');
+            
+            // Remove placeholder if exists
+            if (alertList.querySelector('p')) {
+                alertList.innerHTML = '';
+            }
+            
+            const item = document.createElement('div');
+            item.className = `alert-item ${alert.severity || 'medium'}`;
+            item.innerHTML = `
+                <strong>${alert.type || 'Alert'}</strong>
+                <p style="margin-top: 5px; font-size: 14px;">${alert.message}</p>
+                <div class="timestamp">${new Date(alert.timestamp).toLocaleString()}</div>
+            `;
+            
+            alertList.insertBefore(item, alertList.firstChild);
+            
+            // Keep only last 20 alerts
+            while (alertList.children.length > 20) {
+                alertList.removeChild(alertList.lastChild);
+            }
+        }
+        
+        // Socket.IO event handlers
+        socket.on('connect', () => {
+            console.log('Connected to server');
+        });
+        
+        socket.on('traffic_update', (stats) => {
+            updateStats(stats);
+        });
+        
+        socket.on('new_detection', (detection) => {
+            addDetection(detection);
+        });
+        
+        socket.on('new_alert', (alert) => {
+            addAlert(alert);
+        });
+        
+        // Utility functions
+        function formatNumber(num) {
+            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        }
+        
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        }
+        
+        // Load initial data
+        fetch('/api/stats')
+            .then(res => res.json())
+            .then(data => updateStats(data))
+            .catch(err => console.error('Error loading stats:', err));
+        
+        fetch('/api/detections?limit=20')
+            .then(res => res.json())
+            .then(data => {
+                data.forEach(detection => addDetection(detection));
+            })
+            .catch(err => console.error('Error loading detections:', err));
+        
+        fetch('/api/alerts?limit=10')
+            .then(res => res.json())
+            .then(data => {
+                data.forEach(alert => addAlert(alert));
+            })
+            .catch(err => console.error('Error loading alerts:', err));
+        
+        setInterval(() => {
+            const now = Date.now();
+            if (now - lastTrafficUpdate > 2000) {
+                fetch('/api/stats')
+                    .then(res => res.json())
+                    .then(data => updateStats(data))
+                    .catch(() => {});
+            }
+            if (now - lastDetectionsFetch > 3000) {
+                lastDetectionsFetch = now;
+                fetch('/api/detections?limit=10')
+                    .then(res => res.json())
+                    .then(data => {
+                        data.forEach(d => addDetection(d));
+                    })
+                    .catch(() => {});
+            }
+            if (now - lastAlertsFetch > 4000) {
+                lastAlertsFetch = now;
+                fetch('/api/alerts?limit=10')
+                    .then(res => res.json())
+                    .then(data => {
+                        data.forEach(a => addAlert(a));
+                    })
+                    .catch(() => {});
+            }
+        }, 1500);
+    </script>
+</body>
+</html>
