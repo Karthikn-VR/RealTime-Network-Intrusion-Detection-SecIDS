@@ -3,9 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Real-Time Network Intrusion Detection System</title>
-    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <title>Network Intrusion Detection System</title>
+    
+    <!-- Fixed: Latest Socket.IO v4.8.1 - Global standalone build (exposes 'io' globally) -->
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js" 
+            integrity="sha384-mkQ3/7FUtcGyoppY6bz/PORYoGqOl7/aSUMn2ymDOJcapfS6PHqxhRTMh1RR0Q6+" 
+            crossorigin="anonymous"></script>
+    
+    <!-- Updated: Latest Chart.js v4.5.1 via reliable jsDelivr CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+    
     <style>
         * {
             margin: 0;
@@ -14,38 +21,66 @@
         }
         
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: #333;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
             min-height: 100vh;
             padding: 20px;
         }
         
         .container {
-            max-width: 1400px;
+            max-width: 1600px;
             margin: 0 auto;
         }
         
+        /* Header */
         .header {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 20px 24px;
             margin-bottom: 20px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .header-icon {
+            width: 28px;
+            height: 28px;
+            color: #10b981;
         }
         
         .header h1 {
-            color: #667eea;
-            margin-bottom: 10px;
+            font-size: 24px;
+            font-weight: 600;
+            color: #f8fafc;
+            margin-bottom: 4px;
+        }
+        
+        .header p {
+            font-size: 13px;
+            color: #94a3b8;
         }
         
         .status-indicator {
-            display: inline-block;
-            width: 12px;
-            height: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
-            background: #4caf50;
-            margin-right: 8px;
+            background: #10b981;
+            box-shadow: 0 0 8px #10b981;
             animation: pulse 2s infinite;
         }
         
@@ -54,240 +89,498 @@
             50% { opacity: 0.5; }
         }
         
+        .status-text {
+            font-size: 13px;
+            color: #94a3b8;
+        }
+        
+        /* Stats Grid */
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
             margin-bottom: 20px;
         }
         
         .stat-card {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            transition: transform 0.2s;
+            background: rgba(30, 41, 59, 0.6);
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 16px;
+            transition: transform 0.2s, border-color 0.2s;
         }
         
         .stat-card:hover {
-            transform: translateY(-5px);
+            transform: translateY(-2px);
         }
         
-        .stat-card h3 {
-            color: #666;
-            font-size: 14px;
-            margin-bottom: 10px;
+        .stat-card.alert {
+            background: rgba(239, 68, 68, 0.05);
+            border-color: rgba(239, 68, 68, 0.2);
+        }
+        
+        .stat-card.alert:hover {
+            border-color: #ef4444;
+        }
+        
+        .stat-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        
+        .stat-icon {
+            width: 20px;
+            height: 20px;
+        }
+        
+        .stat-label {
+            font-size: 11px;
+            color: #94a3b8;
             text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 500;
         }
         
-        .stat-card .value {
-            font-size: 32px;
-            font-weight: bold;
-            color: #667eea;
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
         }
         
-        .stat-card.danger .value {
-            color: #f44336;
-        }
+        .stat-card:nth-child(1) .stat-value { color: #3b82f6; }
+        .stat-card:nth-child(2) .stat-value { color: #8b5cf6; }
+        .stat-card:nth-child(3) .stat-value { color: #10b981; }
+        .stat-card:nth-child(4) .stat-value { color: #ef4444; }
+        .stat-card:nth-child(5) .stat-value { color: #06b6d4; }
         
-        .stat-card.warning .value {
-            color: #ff9800;
-        }
-        
+        /* Main Content */
         .main-content {
             display: grid;
-            grid-template-columns: 2fr 1fr;
+            grid-template-columns: 1fr 380px;
             gap: 20px;
-            margin-bottom: 20px;
         }
         
+        .left-column, .right-column {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        /* Panel */
         .panel {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            background: rgba(30, 41, 59, 0.6);
+            border: 1px solid #334155;
+            border-radius: 8px;
+            overflow: hidden;
         }
         
-        .panel h2 {
-            color: #667eea;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #eee;
+        .panel-header {
+            padding: 14px 18px;
+            border-bottom: 1px solid #334155;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(15, 23, 42, 0.4);
         }
         
+        .panel-icon {
+            width: 18px;
+            height: 18px;
+            color: #10b981;
+        }
+        
+        .panel-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #f8fafc;
+        }
+        
+        .panel-content {
+            padding: 12px;
+        }
+        
+        /* Detection List */
         .detection-list {
             max-height: 400px;
             overflow-y: auto;
+            padding: 4px;
         }
         
         .detection-item {
-            padding: 15px;
-            margin-bottom: 10px;
-            border-left: 4px solid #f44336;
-            background: #fff5f5;
-            border-radius: 5px;
+            background: rgba(239, 68, 68, 0.05);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            border-left: 3px solid #ef4444;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 8px;
+            font-size: 13px;
         }
         
         .detection-item.normal {
-            border-left-color: #4caf50;
-            background: #f1f8f4;
+            background: rgba(16, 185, 129, 0.05);
+            border-color: rgba(16, 185, 129, 0.2);
+            border-left-color: #10b981;
         }
         
-        .detection-item h4 {
-            color: #333;
-            margin-bottom: 5px;
+        .detection-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
         }
         
-        .detection-item .meta {
+        .detection-ips {
+            font-weight: 600;
+            color: #f8fafc;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .detection-badge {
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+        
+        .detection-badge.threat {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+        
+        .detection-badge.normal {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+        }
+        
+        .detection-meta {
+            color: #94a3b8;
             font-size: 12px;
-            color: #666;
-            margin-top: 5px;
+            margin-bottom: 8px;
         }
         
         .confidence-bar {
-            width: 100%;
-            height: 8px;
-            background: #eee;
-            border-radius: 4px;
-            margin-top: 8px;
+            height: 4px;
+            background: rgba(51, 65, 85, 0.5);
+            border-radius: 2px;
             overflow: hidden;
+            margin-bottom: 6px;
         }
         
         .confidence-fill {
             height: 100%;
-            background: linear-gradient(90deg, #4caf50, #ff9800, #f44336);
             transition: width 0.3s;
         }
         
-        .alert-list {
-            max-height: 300px;
-            overflow-y: auto;
+        .confidence-fill.threat {
+            background: linear-gradient(90deg, #ef4444, #f87171);
         }
         
-        .alert-item {
-            padding: 12px;
-            margin-bottom: 8px;
-            border-radius: 5px;
-            background: #fff3cd;
-            border-left: 4px solid #ff9800;
+        .confidence-fill.normal {
+            background: linear-gradient(90deg, #10b981, #34d399);
         }
         
-        .alert-item.high {
-            background: #f8d7da;
-            border-left-color: #f44336;
-        }
-        
-        .chart-container {
-            position: relative;
-            height: 300px;
-            margin-top: 20px;
-        }
-        
-        .protocol-list {
-            list-style: none;
-        }
-        
-        .protocol-list li {
-            padding: 8px;
-            margin-bottom: 5px;
-            background: #f5f5f5;
-            border-radius: 5px;
+        .detection-footer {
             display: flex;
             justify-content: space-between;
+            font-size: 11px;
+        }
+        
+        .confidence-text {
+            color: #64748b;
         }
         
         .timestamp {
-            font-size: 11px;
-            color: #999;
+            color: #475569;
+        }
+        
+        /* Alert List */
+        .alert-list {
+            max-height: 280px;
+            overflow-y: auto;
+            padding: 4px;
+        }
+        
+        .alert-item {
+            border-radius: 6px;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+        }
+        
+        .alert-item.high {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid #ef4444;
+            border-left: 3px solid #ef4444;
+        }
+        
+        .alert-item.medium {
+            background: rgba(249, 115, 22, 0.1);
+            border: 1px solid #f97316;
+            border-left: 3px solid #f97316;
+        }
+        
+        .alert-item.low {
+            background: rgba(234, 179, 8, 0.1);
+            border: 1px solid #eab308;
+            border-left: 3px solid #eab308;
+        }
+        
+        .alert-title {
+            font-weight: 600;
+            font-size: 13px;
+            margin-bottom: 4px;
+        }
+        
+        .alert-item.high .alert-title { color: #ef4444; }
+        .alert-item.medium .alert-title { color: #f97316; }
+        .alert-item.low .alert-title { color: #eab308; }
+        
+        .alert-message {
+            font-size: 12px;
+            color: #cbd5e1;
+            line-height: 1.4;
+            margin-bottom: 6px;
+        }
+        
+        .alert-time {
+            font-size: 10px;
+            color: #64748b;
+        }
+        
+        /* Protocol List */
+        .protocol-list {
+            list-style: none;
+            padding: 4px;
+        }
+        
+        .protocol-item {
+            background: rgba(51, 65, 85, 0.3);
+            border: 1px solid #334155;
+            border-radius: 6px;
+            padding: 10px 12px;
+            margin-bottom: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+        }
+        
+        .protocol-name {
+            color: #e2e8f0;
+            font-weight: 500;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .protocol-count {
+            color: #10b981;
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+        }
+        
+        /* Chart Container */
+        .chart-container {
+            height: 280px;
+            position: relative;
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #64748b;
+            font-size: 13px;
+        }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+        
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
         }
         
         @media (max-width: 768px) {
-            .main-content {
-                grid-template-columns: 1fr;
+            .stats-grid {
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            }
+            
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
             }
         }
     </style>
 </head>
 <body>
     <div class="container">
+        <!-- Header -->
         <div class="header">
-            <h1>
-                <span class="status-indicator"></span>
-                Real-Time Network Intrusion Detection System
-            </h1>
-            <p>Monitoring network traffic and detecting intrusions using SecIDS-CNN</p>
+            <div class="header-left">
+                <svg class="header-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                </svg>
+                <div>
+                    <h1>Network Intrusion Detection System</h1>
+                    <p>Real-time monitoring powered by SecIDS-CNN</p>
+                </div>
+            </div>
+            <div class="status-indicator">
+                <div class="status-dot"></div>
+                <span class="status-text">Active</span>
+            </div>
         </div>
         
+        <!-- Stats Grid -->
         <div class="stats-grid">
             <div class="stat-card">
-                <h3>Total Packets</h3>
-                <div class="value" id="total-packets">0</div>
+                <div class="stat-header">
+                    <svg class="stat-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/>
+                    </svg>
+                    <span class="stat-label">Total Packets</span>
+                </div>
+                <div class="stat-value" id="total-packets">0</div>
             </div>
+            
             <div class="stat-card">
-                <h3>Total Flows</h3>
-                <div class="value" id="total-flows">0</div>
+                <div class="stat-header">
+                    <svg class="stat-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                    <span class="stat-label">Total Flows</span>
+                </div>
+                <div class="stat-value" id="total-flows">0</div>
             </div>
+            
             <div class="stat-card">
-                <h3>Packets/Second</h3>
-                <div class="value" id="packets-per-sec">0</div>
+                <div class="stat-header">
+                    <svg class="stat-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                    </svg>
+                    <span class="stat-label">Packets/Second</span>
+                </div>
+                <div class="stat-value" id="packets-per-sec">0</div>
             </div>
-            <div class="stat-card danger">
-                <h3>Intrusions Detected</h3>
-                <div class="value" id="intrusions">0</div>
+            
+            <div class="stat-card alert">
+                <div class="stat-header">
+                    <svg class="stat-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                    <span class="stat-label">Intrusions Detected</span>
+                </div>
+                <div class="stat-value" id="intrusions">0</div>
             </div>
+            
             <div class="stat-card">
-                <h3>Data Rate</h3>
-                <div class="value" id="data-rate">0 KB/s</div>
+                <div class="stat-header">
+                    <svg class="stat-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <span class="stat-label">Data Rate</span>
+                </div>
+                <div class="stat-value" id="data-rate">0 B/s</div>
             </div>
         </div>
         
+        <!-- Main Content -->
         <div class="main-content">
-            <div>
+            <!-- Left Column -->
+            <div class="left-column">
+                <!-- Detections Panel -->
                 <div class="panel">
-                    <h2>Recent Detections</h2>
-                    <div class="detection-list" id="detection-list">
-                        <p style="text-align: center; color: #999; padding: 20px;">
-                            Waiting for network traffic...
-                        </p>
+                    <div class="panel-header">
+                        <svg class="panel-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                        </svg>
+                        <h2 class="panel-title">Recent Detections</h2>
+                    </div>
+                    <div class="panel-content">
+                        <div class="detection-list" id="detection-list">
+                            <div class="empty-state">Waiting for network traffic...</div>
+                        </div>
                     </div>
                 </div>
                 
-                <div class="panel" style="margin-top: 20px;">
-                    <h2>Traffic Statistics</h2>
-                    <div class="chart-container">
-                        <canvas id="traffic-chart"></canvas>
+                <!-- Traffic Chart Panel -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <svg class="panel-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                        </svg>
+                        <h2 class="panel-title">Traffic Statistics</h2>
+                    </div>
+                    <div class="panel-content">
+                        <div class="chart-container">
+                            <canvas id="traffic-chart"></canvas>
+                        </div>
                     </div>
                 </div>
             </div>
             
-            <div>
+            <!-- Right Column -->
+            <div class="right-column">
+                <!-- Alerts Panel -->
                 <div class="panel">
-                    <h2>Alerts</h2>
-                    <div class="alert-list" id="alert-list">
-                        <p style="text-align: center; color: #999; padding: 20px;">
-                            No alerts
-                        </p>
+                    <div class="panel-header">
+                        <svg class="panel-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                        <h2 class="panel-title">Security Alerts</h2>
+                    </div>
+                    <div class="panel-content">
+                        <div class="alert-list" id="alert-list">
+                            <div class="empty-state">No alerts</div>
+                        </div>
                     </div>
                 </div>
                 
-                <div class="panel" style="margin-top: 20px;">
-                    <h2>Protocol Distribution</h2>
-                    <ul class="protocol-list" id="protocol-list">
-                        <li>Loading...</li>
-                    </ul>
+                <!-- Protocol Distribution Panel -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <svg class="panel-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/>
+                        </svg>
+                        <h2 class="panel-title">Protocol Distribution</h2>
+                    </div>
+                    <div class="panel-content">
+                        <ul class="protocol-list" id="protocol-list">
+                            <li class="protocol-item">
+                                <span class="protocol-name">Loading...</span>
+                            </li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
     
     <script>
-        // Initialize Socket.IO
+        // Initialize Socket.IO (now works correctly with global 'io')
         const socket = io();
         
         let lastTrafficUpdate = 0;
-        let lastDetectionsFetch = 0;
-        let lastAlertsFetch = 0;
-        
+
         // Initialize Chart.js
         const ctx = document.getElementById('traffic-chart').getContext('2d');
         const trafficChart = new Chart(ctx, {
@@ -297,23 +590,43 @@
                 datasets: [{
                     label: 'Packets/sec',
                     data: [],
-                    borderColor: '#667eea',
-                    backgroundColor: 'rgba(102, 126, 234, 0.1)',
-                    tension: 0.4
+                    borderColor: '#10b981',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    borderWidth: 2,
+                    tension: 0.4,
+                    pointRadius: 0
                 }, {
-                    label: 'Bytes/sec',
+                    label: 'KB/sec',
                     data: [],
-                    borderColor: '#764ba2',
-                    backgroundColor: 'rgba(118, 75, 162, 0.1)',
-                    tension: 0.4
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    borderWidth: 2,
+                    tension: 0.4,
+                    pointRadius: 0
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            color: '#9ca3af',
+                            font: { size: 11 }
+                        }
+                    }
+                },
                 scales: {
                     y: {
-                        beginAtZero: true
+                        beginAtZero: true,
+                        grid: { color: 'rgba(75, 85, 99, 0.3)' },
+                        ticks: { color: '#9ca3af', font: { size: 10 } }
+                    },
+                    x: {
+                        grid: { color: 'rgba(75, 85, 99, 0.3)' },
+                        ticks: { color: '#9ca3af', font: { size: 10 }, maxRotation: 0 }
                     }
                 }
             }
@@ -321,32 +634,30 @@
         
         // Update statistics
         function updateStats(stats) {
-            document.getElementById('total-packets').textContent = 
-                formatNumber(stats.packets_captured || 0);
-            document.getElementById('total-flows').textContent = 
-                formatNumber(stats.flows_processed || 0);
-            document.getElementById('packets-per-sec').textContent = 
-                (stats.packets_per_second || 0).toFixed(1);
-            document.getElementById('intrusions').textContent = 
-                formatNumber(stats.intrusions_detected || 0);
+            document.getElementById('total-packets').textContent = formatNumber(stats.packets_captured || 0);
+            document.getElementById('total-flows').textContent = formatNumber(stats.flows_processed || 0);
+            document.getElementById('packets-per-sec').textContent = (stats.packets_per_second || 0).toFixed(1);
+            document.getElementById('intrusions').textContent = formatNumber(stats.intrusions_detected || 0);
             
             const bytesPerSec = stats.bytes_per_second || 0;
-            document.getElementById('data-rate').textContent = 
-                formatBytes(bytesPerSec) + '/s';
+            document.getElementById('data-rate').textContent = formatBytes(bytesPerSec) + '/s';
             
             // Update protocol distribution
             const protocolList = document.getElementById('protocol-list');
             const protocols = stats.protocol_distribution || {};
             
             if (Object.keys(protocols).length === 0) {
-                protocolList.innerHTML = '<li>No protocol data</li>';
+                protocolList.innerHTML = '<li class="protocol-item"><span class="protocol-name">No protocol data</span></li>';
             } else {
                 protocolList.innerHTML = Object.entries(protocols)
                     .sort((a, b) => b[1] - a[1])
-                    .slice(0, 10)
-                    .map(([protocol, count]) => 
-                        `<li><span>${protocol}</span><span>${formatNumber(count)}</span></li>`
-                    ).join('');
+                    .slice(0, 8)
+                    .map(([protocol, count]) => `
+                        <li class="protocol-item">
+                            <span class="protocol-name">${protocol}</span>
+                            <span class="protocol-count">${formatNumber(count)}</span>
+                        </li>
+                    `).join('');
             }
             
             // Update chart
@@ -371,27 +682,31 @@
             const detectionList = document.getElementById('detection-list');
             
             // Remove placeholder if exists
-            if (detectionList.querySelector('p')) {
+            const emptyState = detectionList.querySelector('.empty-state');
+            if (emptyState) {
                 detectionList.innerHTML = '';
             }
             
-            const item = document.createElement('div');
-            item.className = `detection-item ${detection.prediction === 'Normal' ? 'normal' : ''}`;
-            
+            const isNormal = detection.prediction === 'Normal';
             const confidence = (detection.confidence * 100).toFixed(1);
             
+            const item = document.createElement('div');
+            item.className = `detection-item ${isNormal ? 'normal' : ''}`;
             item.innerHTML = `
-                <h4>${detection.src_ip} → ${detection.dst_ip}</h4>
-                <div class="meta">
-                    Protocol: ${detection.protocol} | 
-                    Packets: ${detection.total_packets} | 
-                    Duration: ${detection.flow_duration.toFixed(2)}s
+                <div class="detection-header">
+                    <div class="detection-ips">${detection.src_ip} → ${detection.dst_ip}</div>
+                    <div class="detection-badge ${isNormal ? 'normal' : 'threat'}">${detection.prediction}</div>
+                </div>
+                <div class="detection-meta">
+                    ${detection.protocol} • ${detection.total_packets} packets • ${detection.flow_duration.toFixed(2)}s
                 </div>
                 <div class="confidence-bar">
-                    <div class="confidence-fill" style="width: ${confidence}%"></div>
+                    <div class="confidence-fill ${isNormal ? 'normal' : 'threat'}" style="width: ${confidence}%"></div>
                 </div>
-                <div class="meta">Confidence: ${confidence}%</div>
-                <div class="timestamp">${new Date().toLocaleString()}</div>
+                <div class="detection-footer">
+                    <span class="confidence-text">Confidence: ${confidence}%</span>
+                    <span class="timestamp">${new Date().toLocaleTimeString()}</span>
+                </div>
             `;
             
             detectionList.insertBefore(item, detectionList.firstChild);
@@ -407,16 +722,19 @@
             const alertList = document.getElementById('alert-list');
             
             // Remove placeholder if exists
-            if (alertList.querySelector('p')) {
+            const emptyState = alertList.querySelector('.empty-state');
+            if (emptyState) {
                 alertList.innerHTML = '';
             }
             
+            const severity = alert.severity || 'medium';
+            
             const item = document.createElement('div');
-            item.className = `alert-item ${alert.severity || 'medium'}`;
+            item.className = `alert-item ${severity}`;
             item.innerHTML = `
-                <strong>${alert.type || 'Alert'}</strong>
-                <p style="margin-top: 5px; font-size: 14px;">${alert.message}</p>
-                <div class="timestamp">${new Date(alert.timestamp).toLocaleString()}</div>
+                <div class="alert-title">${alert.type || 'Security Alert'}</div>
+                <div class="alert-message">${alert.message}</div>
+                <div class="alert-time">${new Date(alert.timestamp).toLocaleString()}</div>
             `;
             
             alertList.insertBefore(item, alertList.firstChild);
@@ -454,7 +772,7 @@
             const k = 1024;
             const sizes = ['B', 'KB', 'MB', 'GB'];
             const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+            return (bytes / Math.pow(k, i)).toFixed(1) + ' ' + sizes[i];
         }
         
         // Load initial data
@@ -477,6 +795,7 @@
             })
             .catch(err => console.error('Error loading alerts:', err));
         
+        // Polling for updates (fallback)
         setInterval(() => {
             const now = Date.now();
             if (now - lastTrafficUpdate > 2000) {
@@ -485,25 +804,7 @@
                     .then(data => updateStats(data))
                     .catch(() => {});
             }
-            if (now - lastDetectionsFetch > 3000) {
-                lastDetectionsFetch = now;
-                fetch('/api/detections?limit=10')
-                    .then(res => res.json())
-                    .then(data => {
-                        data.forEach(d => addDetection(d));
-                    })
-                    .catch(() => {});
-            }
-            if (now - lastAlertsFetch > 4000) {
-                lastAlertsFetch = now;
-                fetch('/api/alerts?limit=10')
-                    .then(res => res.json())
-                    .then(data => {
-                        data.forEach(a => addAlert(a));
-                    })
-                    .catch(() => {});
-            }
-        }, 1500);
+        }, 2000);
     </script>
 </body>
 </html>
